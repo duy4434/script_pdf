@@ -1,0 +1,66 @@
+การสร้างไฟล์ pdf
+create pdf
+/* สร้างเมนู pdf ใน Google Sheet */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('PDF')
+      .addItem('สร้างไฟล์ PDF','run_pdf')
+      .addToUi();
+}
+function run_pdf() {
+  runPDFs();
+}
+
+/* สร้างไฟล์ pdf */
+function runPDFs() {
+
+const docFile = DriveApp.getFileById("id doc"); 
+const tempFolder = DriveApp.getFolderById("id temp"); 
+const pdfFolder = DriveApp.getFolderById("id pdf"); 
+const currentSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("แผ่น1"); //ชื่อชีต
+
+var patternData=["{วันที่สมัคร}","{ชื่อ สกุล}","{ชื่อเล่น}","{อีเมล}","{เบอร์โทรศัพท์}","{เพศ}","{อายุ}",
+"{กรุ๊ปเลือด}","{รูปภาพ}","{idรูปภาพ}"];
+  
+ /* กำหนดช่วงข้อมูลที่จะนำไปสร้างไฟล์ pdf */
+const data = currentSheet.getRange(2, 1, currentSheet.getLastRow()-1,currentSheet.getLastColumn()).getDisplayValues();
+
+data.forEach(row => {createPDF(row, patternData,row[1],docFile, tempFolder, pdfFolder)});
+
+}
+
+/* กำหนดค่าที่จะนำมาสร้างไฟล์ pdf */
+
+function createPDF ( data, pattern, pdfName,  docFile, tempFolder, pdfFolder) {
+const tempFile = docFile.makeCopy(tempFolder);
+const tempDocFile = DocumentApp.openById(tempFile.getId());
+const body = tempDocFile.getBody();
+var replaceTextToImage = function( body,searchText, image, width) {
+
+    var next = body.findText(searchText);
+    if (!next) return;
+    var r = next.getElement();
+    r.asText().setText("");
+    var img = r.getParent().asParagraph().insertInlineImage(0, image);
+    if (width && typeof width == "number") {
+      var w = img.getWidth();
+      var h = img.getHeight();
+      img.setWidth(width);
+      img.setHeight(width * h / w);
+    }
+    return next;
+  };
+
+  for (var i=0;i<data.length-1;i++){
+    body.replaceText(pattern[i], data[i]);
+    Logger.log(pattern[i]+" : "+data[i]);
+  }
+  var replaceText = pattern[data.length-1]; //ชื่อข้อความใน doc ที่ต้องการจะเปลี่ยนเป็นรูป
+  var imageFileId = data[data.length-1]; //id ในdrive ตรวจสอบลำดับ คอลัมภ์รูปภาพให้ดีก่อน     
+  var image = DriveApp.getFileById(imageFileId).getBlob();
+      next = replaceTextToImage(body, replaceText, image, 100);
+tempDocFile.saveAndClose();
+const pdfContentBlob = tempFile.getAs(MimeType.PDF);
+pdfFolder.createFile(pdfContentBlob).setName(pdfName);
+tempFolder.removeFile(tempFile);
+}
